@@ -35,7 +35,7 @@ const String gAcc = SECRET_SEND_ACCOUNT,  // "animerecommendationsdu@gmail.com"
 
 const int port = 465;                    //587 for TLS does not work
 const char server[] = "smtp.gmail.com";  // name address for Gmail SMTP (using DNS)
-const char numberOfRecipient = 15;
+const char numberOfRecipient = 1;
 byte mac[6];
 
 
@@ -50,9 +50,10 @@ time_t startFlowTime, endFlowTime;
 time_t endFlowRateTime;
 time_t prevDisplay = 0;  // when the digital clock was displayed
 
+time_t lastPingGoogleTime = 0;
 // WiFiClient timeClient;
 
-WiFiClient client;
+WiFiClient client;  //deprecated
 
 bool matchWord(const char *start, const char *end, const String word);
 void requestTimeFromWebsite(WiFiClient &client);
@@ -76,6 +77,7 @@ time_t timeDifference(time_t oldTime, time_t newerTime);
 void printEncryptionType(int thisType) ;
 void reconnectToWifi();
 void print2Digits(byte thisByte);
+void pingGoogle();
 
 void listNetworks();
 void setup() {
@@ -98,18 +100,24 @@ void setup() {
   printMacAddress();
   Serial.println("waiting for sync by connecting to wifi");
   Serial1.println("waiting for sync by connecting to wifi");  
+  delay(1000);
+  //analogWrite(LED_BUILTIN,100);
   //_connectToWifi(ssid, pass);
+  WiFi.lowPowerMode();
   listNetworks();
-  __connectToWifiEnterprise(ssid, username, pass);
-
+  //__connectToWifiEnterprise(ssid, username, pass);
+  _connectToWifi(ssid, pass);
   // while(timeStatus() == timeNotSet){
   //   setTime(getTimeFromWebsite());
   // }
 
-  //setSyncProvider(getTimeFromWebsite);
+  // setSyncProvider(getTimeFromWebsite);
+  // setSyncInterval(5*60);// every 5 minutes
   setSyncInterval(-1);
   setTime(1357041600);
   digitalWrite(LED_BUILTIN, HIGH);  // light led indicate connected to wifi
+  delay(1000);
+  pingGoogle();
 }
 
 
@@ -147,7 +155,8 @@ time_t getTimeFromWebsite() {
 }
 void loop() {
   //Serial.println(getWifiTime(),DEC);
-  
+  int sensorVal = digitalRead(2);
+  time_t timeNow = now();
   Serial.print("Wifi status  ");
   Serial.println(WiFi.status());
   if(WiFi.status() != WL_CONNECTED){
@@ -157,18 +166,25 @@ void loop() {
   }else{
     // means has wifi
   }
-  if (timeStatus() != timeNotSet) {
-    if (now() != prevDisplay) {  //update the display only if time has changed
-      prevDisplay = now();
-      digitalClockDisplay();
-    }
-  } else {
-    Serial.println("time status is not set");
-    return;
-  }
 
-  int sensorVal = digitalRead(2);
-  time_t timeNow = now();
+  // time_t pingTimeDifference = timeDifference(lastPingGoogleTime, timeNow);
+  // Serial.print("Ping time difference: ");
+  // Serial.println(pingTimeDifference);
+  // if(pingTimeDifference > 5*60){//pin every  minute
+  //      pingGoogle();
+  //      lastPingGoogleTime=timeNow;
+  // } 
+  // if (timeStatus() != timeNotSet) {
+  //   if (now() != prevDisplay) {  //update the display only if time has changed
+  //     prevDisplay = now();
+  //     digitalClockDisplay();
+  //   }
+  // } else {
+  //   Serial.println("time status is not set");
+  //   return;
+  // }
+
+
   Serial.print("the curent state is ");
   Serial.println(stateStatus, DEC);
   Serial.print("The previous state is ");
@@ -192,6 +208,7 @@ void loop() {
       endFlowRateTime = timeNow;
       updateStateStatus(0);
     }
+    lastPingGoogleTime=timeNow;
 
   } else if (stateStatus == 0) {
     // means no water flow
@@ -331,8 +348,9 @@ void loop() {
 
 
 void reconnectToWifi(){
-  digitalWrite(LED_BUILTIN,LOW);
-
+  //digitalWrite(LED_BUILTIN,LOW);
+  analogWrite(LED_BUILTIN,200);
+  WiFi.end();
   listNetworks();
   __connectToWifiEnterprise(ssid, username, pass); //while loop that connect to wifi
   // reconnect to wifi
@@ -543,28 +561,27 @@ bool sendEmailAlert(char *message) {
 
 void addEmailRecipient(WiFiSSLClient &client) {
 
-  char emails[numberOfRecipient][50] = {
-    "sloef714@students.bju.edu",
-    "slott467@students.bju.edu",
-    "dhaas971@students.bju.edu",
-    "mpark672@students.bju.edu",
-    "nhard538@students.bju.edu",
-    "mthom521@students.bju.edu",
-    "mdalp143@students.bju.edu",
-    "dwinn758@students.bju.edu",
-    "kwayc426@students.bju.edu",
-    "pvosb324@students.bju.edu",
-    "scass554@students.bju.edu",
-    "amose658@students.bju.edu",
-    "blovegro@bju.edu",
-    "szimm347@students.bju.edu"
+  // char emails[numberOfRecipient][50] = {
+  //   "sloef714@students.bju.edu",
+  //   "slott467@students.bju.edu",
+  //   "dhaas971@students.bju.edu",
+  //   "mpark672@students.bju.edu",
+  //   "nhard538@students.bju.edu",
+  //   "mthom521@students.bju.edu",
+  //   "mdalp143@students.bju.edu",
+  //   "dwinn758@students.bju.edu",
+  //   "kwayc426@students.bju.edu",
+  //   "pvosb324@students.bju.edu",
+  //   "scass554@students.bju.edu",
+  //   "amose658@students.bju.edu",
+  //   "blovegro@bju.edu",
+  //   "szimm347@students.bju.edu",
+  //   "sdu568@students.bju.edu"
+  // };
+  char emails[numberOfRecipient][40]{
+    "sdu568@students.bju.edu"
   };
-  // char emails[numberOfRecipient][40]{
-  //   "sdu568@students.bju.edu"
-  // };
-  //   char emails[1][50]={
-  //   "sdu568@students.bju.edu"
-  // };
+
   // Serial.println("Sending To: <start>RCPT To: <sdu568@students.bju.edu><end>");
   // client.println(F("RCPT To: <sdu568@students.bju.edu>"));
   // client.println(F("RCPT To: <joeldushouyu@gmail.com>"));
@@ -609,11 +626,33 @@ void printMacAddress() {
   Serial.println(mac[0], HEX);
 }
 
+void pingGoogle(){
+  char server[] = "www.google.com"; // name address for Google (using DNS)
+  WiFiClient googleClient;
+  if (googleClient.connect(server, 80)) {
+    Serial.println("connected to server");
+    // Make a HTTP request:
+    googleClient.println("GET /search?q=arduino HTTP/1.1");
+    googleClient.println("Host: www.google.com");
+    googleClient.println("Connection: close");
+    googleClient.println();
+  }else{
+    Serial.print("failed to connect to Google");
+  }
+  delay(10000);
+  while(googleClient.available()){
+    char c = googleClient.read();
+    Serial.write(c);
+  }
+  googleClient.stop();
+
+
+}
 
 void requestTimeFromWebsite2() {
   char server[] = "www.worldclockapi.com";  // name address for Google (using DNS)
   if (client.connect(server, 80)) {
-    Serial.println("connected to server");
+    Serial.println("connected to server for time");
     // Make a HTTP request:
     client.println("GET /api/json/est/now HTTP/1.1");
     client.println("Host: worldclockapi.com");

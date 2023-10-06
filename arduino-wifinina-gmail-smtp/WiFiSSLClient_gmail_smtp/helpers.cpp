@@ -38,8 +38,8 @@ void __connectToWifiEnterprise(const char*ssid, const char *username, const char
     // Connect to WPA/WPA2 network. Change this line if using open or WEP network:
     status = WiFi.beginEnterprise(ssid,username, pass);
 
-    // wait 1 seconds for connection:
-    delay(1000);
+    // wait 10 seconds for connection:
+    delay(10000);
   }
   Serial.println("Connected to wifi");
   _printWiFiStatus();
