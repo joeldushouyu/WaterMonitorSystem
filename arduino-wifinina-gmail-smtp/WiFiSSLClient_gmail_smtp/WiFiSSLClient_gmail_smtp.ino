@@ -51,34 +51,20 @@ time_t endFlowRateTime;
 time_t prevDisplay = 0;  // when the digital clock was displayed
 
 time_t lastPingGoogleTime = 0;
-// WiFiClient timeClient;
 
-WiFiClient client;  //deprecated
 
-bool matchWord(const char *start, const char *end, const String word);
-void requestTimeFromWebsite(WiFiClient &client);
-time_t findUnixTime(const String &originalString);
 void printMacAddress();
 void printMacAddress(byte mac[]) ;
 void addEmailRecipient(WiFiSSLClient &client);
-time_t getWifiTime();
 bool sendEmailAlert(char *message);
-bool isWaterFlowing();
-void printDigits(int digits);
-void digitalClockDisplay();
 int timeDifferenceInMinute(time_t t);
-void requestTimeFromWebsite2();
-time_t getTimeFromWebsite();
-
 void controlLEDBaseOnStatus();
 void updateStateStatus(char newStatus);
-String timeToStr(time_t timeInUnix);
 time_t timeDifference(time_t oldTime, time_t newerTime);
 void printEncryptionType(int thisType) ;
 void reconnectToWifi();
-void print2Digits(byte thisByte);
-void pingGoogle();
 
+void pingGoogle();
 void listNetworks();
 void setup() {
   //Initialize serial and wait for port to open:
@@ -107,12 +93,6 @@ void setup() {
   listNetworks();
   //__connectToWifiEnterprise(ssid, username, pass);
   _connectToWifi(ssid, pass);
-  // while(timeStatus() == timeNotSet){
-  //   setTime(getTimeFromWebsite());
-  // }
-
-  // setSyncProvider(getTimeFromWebsite);
-  // setSyncInterval(5*60);// every 5 minutes
   setSyncInterval(-1);
   setTime(1357041600);
   digitalWrite(LED_BUILTIN, HIGH);  // light led indicate connected to wifi
@@ -121,38 +101,6 @@ void setup() {
 }
 
 
-
-time_t getTimeFromWebsite() {
-  requestTimeFromWebsite2();
-
-
-  time_t res = 0;
-  time_t timeNow = now();
-
-  while (client.available()) {
-    // char c = client.read();
-    // client.readStringUntil()
-
-    String s = client.readString();
-    //Serial.println(s);
-
-
-    if (s == "") {
-
-      res = timeNow;
-    } else {
-      res = findUnixTime(s);  //TODO: use regex later
-    }
-
-    // auto endWithIndex;
-    // Serial.println(k);
-    //Serial.write(c);
-  }
-  Serial.println("The final unix timestamp");
-  Serial.println(res, DEC);
-
-  return res;
-}
 void loop() {
   //Serial.println(getWifiTime(),DEC);
   int sensorVal = digitalRead(2);
@@ -166,23 +114,6 @@ void loop() {
   }else{
     // means has wifi
   }
-
-  // time_t pingTimeDifference = timeDifference(lastPingGoogleTime, timeNow);
-  // Serial.print("Ping time difference: ");
-  // Serial.println(pingTimeDifference);
-  // if(pingTimeDifference > 5*60){//pin every  minute
-  //      pingGoogle();
-  //      lastPingGoogleTime=timeNow;
-  // } 
-  // if (timeStatus() != timeNotSet) {
-  //   if (now() != prevDisplay) {  //update the display only if time has changed
-  //     prevDisplay = now();
-  //     digitalClockDisplay();
-  //   }
-  // } else {
-  //   Serial.println("time status is not set");
-  //   return;
-  // }
 
 
   Serial.print("the curent state is ");
@@ -282,12 +213,6 @@ void loop() {
       time_t diff = timeDifference(startFlowTime, timeNow);
       int minutes = timeDifferenceInMinute(diff);
       Serial.println(minutes, DEC);
-      //sendEmailAlert("const water flow longer than expected time");
-      // stateStatus = 1;// continue to go back
-      // maxFlowTimeErrorCounter++;
-      // maxNoFlowTimeErrorCounter = 0;
-
-      //TODO: remove later?
       if (maxFlowTimeErrorCounter == 0) {
         bool status = sendEmailAlert("const water flow longer than expected time");
         if (status == false) {
@@ -364,14 +289,6 @@ void controlLEDBaseOnStatus() {
   digitalWrite(FLOW_PRESENT, LOW);
   digitalWrite(NO_FLOW_PRESENT, LOW);
 
-
-
-  // if (stateStatus == 0 || previousStateStatus == 0) {
-  //   digitalWrite(NO_FLOW_PRESENT, HIGH);
-  // }
-  // if (stateStatus == 1 || previousStateStatus == 1) {
-  //   digitalWrite(FLOW_PRESENT, HIGH);
-  // }
   if (stateStatus == 2 || previousStateStatus == 2) {
     digitalWrite(ERROR_LED, HIGH);
     if (stateStatus == 0 || previousStateStatus == 0) {
@@ -388,43 +305,11 @@ void controlLEDBaseOnStatus() {
        digitalWrite(FLOW_PRESENT, HIGH);     
     }
   }
-  // if (stateStatus == 100) {
-  //   // means at initalize stage
-  //   digitalWrite(ERROR_LED, HIGH);
-  //   digitalWrite(FLOW_PRESENT, HIGH);
-  //   digitalWrite(NO_FLOW_PRESENT, HIGH);
-  // }
 }
 
-void digitalClockDisplay() {
-  // digital clock display of the time
-  Serial.print(hour());
-  printDigits(minute());
-  printDigits(second());
-  Serial.print(" ");
-  Serial.print(day());
-  Serial.print(".");
-  Serial.print(month());
-  Serial.print(".");
-  Serial.print(year());
-  Serial.println();
-}
 
-// String  timeToStr(time_t timeInUnix){
-//   char timeBuf[100];
 
-//   String s = std::to_string(year(timeInUnix)) + "/"+std::to_string(month(timeInUnix)) + "/" + std::to_string(day(timeInUnix)) + ":" + std::to_string(hour(timeInUnix)) + ":" + std::to_string((minute(timeInUnix))) + ":" + std::to_string((second(timeInUnix)));
 
-//   return s;
-// }
-
-void printDigits(int digits) {
-  // utility for digital clock display: prints preceding colon and leading 0
-  Serial.print(":");
-  if (digits < 10)
-    Serial.print('0');
-  Serial.print(digits);
-}
 
 
 void updateStateStatus(char newStatus) {
@@ -433,14 +318,7 @@ void updateStateStatus(char newStatus) {
   stateStatus = newStatus;
 }
 
-// bool isWaterFlowing() {
-//   int sensorVal = digitalRead(2);
-//   if (sensorVal == 1) {
-//     return true;
-//   } else {
-//     return false;
-//   }
-// }
+
 
 
 bool sendEmailAlert(char *message) {
@@ -649,117 +527,6 @@ void pingGoogle(){
 
 }
 
-void requestTimeFromWebsite2() {
-  char server[] = "www.worldclockapi.com";  // name address for Google (using DNS)
-  if (client.connect(server, 80)) {
-    Serial.println("connected to server for time");
-    // Make a HTTP request:
-    client.println("GET /api/json/est/now HTTP/1.1");
-    client.println("Host: worldclockapi.com");
-    client.println("Connection: close");
-    client.println();
-  }
-  delay(10000);
-}
-
-bool matchWord(const char *start, const char *end, const String word) {
-
-  for (auto k = start, k2 = word.begin(); k != end && k2 != word.end(); k2++, k++) {
-    if (*k != *k2) {
-      return false;
-    }
-  }
-  return true;
-}
-
-// A function that used to parse and extract the date information from the webresponse
-time_t findUnixTime(const String &originalString) {
-
-  bool hasFound = false;
-  int j = 0;
-  String result = "";
-  time_t res = 0;
-  Serial.println(originalString);
-  for (auto c = originalString.begin(); c != originalString.end(); c++, j++) {
-    if (matchWord(c, originalString.end(), "currentDateTime")) {
-
-      //means already found
-      hasFound = true;
-      c += 18;
-      Serial.println("The index");
-      Serial.println(j, DEC);
-      //get hour
-      String year = "";
-      for (int i = 0; i < 4; i++) {
-        year += *c;
-        c++;
-      }
-      c++;
-      // get month
-      String month = "";
-      for (int i = 0; i < 2; i++) {
-        month += *c;
-        c++;
-      }
-      c++;
-      // get date
-      String date = "";
-      for (int i = 0; i < 2; i++) {
-        date += *c;
-        c++;
-      }
-      c++;
-      String hour = "";
-      for (int i = 0; i < 2; i++) {
-        hour += *c;
-        c++;
-      }
-      c++;
-
-      String minute = "";
-      for (int i = 0; i < 2; i++) {
-        minute += *c;
-        c++;
-      }
-      c++;
-      String second = "";
-      for (int i = 0; i < 2; i++) {
-        second += *c;
-        c++;
-      }
-
-      // Serial.println("year");
-      // Serial.println(year);
-      // Serial.println("date");
-      // Serial.println(date);
-      // Serial.println("hour");
-      // Serial.println(hour);
-      // Serial.println("minute");
-      // Serial.println(minute);
-      // Serial.println("second");
-      // Serial.println(second);
-
-
-
-      tmElements_t tm;
-      tm.Year = atoi(year.begin()) - 1970;
-      tm.Month = atoi(month.begin());
-      tm.Day = atoi(date.begin());
-      tm.Hour = atoi(hour.begin());
-      tm.Minute = atoi(minute.begin());
-      tm.Second = atoi(second.begin());
-      res = makeTime(tm);
-      break;
-    } else {
-    }
-  }
-
-  //return atoll(result.begin());
-
-  return res;
-}
-
-
 int timeDifferenceInMinute(time_t t) {
   return t / 60;
 }
@@ -830,14 +597,6 @@ void printEncryptionType(int thisType) {
       break;
   }
 }
-
-void print2Digits(byte thisByte) {
-  if (thisByte < 0xF) {
-    Serial.print("0");
-  }
-  Serial.print(thisByte, HEX);
-}
-
 
 
 
