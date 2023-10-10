@@ -20,10 +20,15 @@ Things to note:
 #include <string>
 // #include <TimeLib.h>
 #include <time.h>
-#define ERROR_LED 12
-#define FLOW_PRESENT 11
-#define NO_FLOW_PRESENT 10
+#define ERROR_LED_TANK_1 12
+#define FLOW_PRESENT_TANK_1 11
+#define NO_FLOW_PRESENT_TANK_1 10
+#define SENSOR_PIN_TANK_1 2
 
+#define ERROR_LED_TANK_2 9
+#define FLOW_PRESENT_TANK_2 7
+#define NO_FLOW_PRESENT_TANK_2 8
+#define SENSOR_PIN_TANK_2 5
 ///////please enter your sensitive data in the Secret tab/arduino_secrets.h
 const char ssid[] = SECRET_SSID;  // your network SSID (name)
 const char pass[] = SECRET_PASS;  // your network password (use for WPA)
@@ -40,14 +45,8 @@ byte mac[6];
 
 
 
-volatile char stateStatus = 100;  // 0 means no waterflow, 1 means water flow, 2 is error, 100 means need initalize
-volatile char previousStateStatus = 0;
-char maxFlowTime = 10;
-volatile char maxFlowTimeErrorCounter = 0;
-char maxNoFlowTime = 20;
-volatile char maxNoFlowTimeErrorCounter = 0;
-volatile time_t startFlowTime, endFlowTime;
-volatile time_t endFlowRateTime;
+
+
 
 
 time_t lastPingGoogleTime = 0;
@@ -58,8 +57,7 @@ void printMacAddress(byte mac[]) ;
 void addEmailRecipient(WiFiSSLClient &client);
 bool sendEmailAlert(char *message);
 int timeDifferenceInMinute(time_t t);
-void controlLEDBaseOnStatus();
-void updateStateStatus(char newStatus);
+
 time_t timeDifference(time_t oldTime, time_t newerTime);
 void printEncryptionType(int thisType) ;
 void reconnectToWifi();
@@ -67,6 +65,24 @@ void reconnectToWifi();
 void pingGoogle();
 void listNetworks();
 time_t readTimeCounter();
+
+
+
+void controlLEDBaseOnStatus(char stateStatus, char previousStateStatus, char errorLEDPin, char flowPresentLEDPin, char noFlowPresentLEDPin);
+void updateStateStatus(volatile char *previousStatus, volatile char *stateStatus,  char newStatus);
+
+//tank 1 specific
+int detectFlowSensor1();
+
+volatile char stateStatusTank1 = 100;  // 0 means no waterflow, 1 means water flow, 2 is error, 100 means need initalize
+volatile char previousStateStatusTank1 = 0;
+const char maxFlowTimeTank1 = 10;
+volatile char maxFlowTimeErrorCounterTank1 = 0;
+const char maxNoFlowTimeTank1 = 20;
+volatile char maxNoFlowTimeErrorCounterTank1 = 0;
+volatile time_t startFlowTimeTank1, endFlowTimeTank1;
+volatile time_t endFlowRateTimeTank1;
+
 
 void setup() {
   //Initialize serial and wait for port to open:
@@ -79,10 +95,10 @@ void setup() {
 
 
   // setup pins for detecing waterFlow
-  pinMode(2, INPUT);
-  pinMode(ERROR_LED, OUTPUT);
-  pinMode(FLOW_PRESENT, OUTPUT);
-  pinMode(NO_FLOW_PRESENT, OUTPUT);
+  pinMode(SENSOR_PIN_TANK_1, INPUT);
+  pinMode(ERROR_LED_TANK_1, OUTPUT);
+  pinMode(FLOW_PRESENT_TANK_1, OUTPUT);
+  pinMode(NO_FLOW_PRESENT_TANK_1, OUTPUT);
 
   //////////////////////  First Connect to WIFI /////////////////////////
   printMacAddress();
@@ -105,7 +121,7 @@ void setup() {
 
 void loop() {
   //Serial.println(getWifiTime(),DEC);
-  int sensorVal = digitalRead(2);
+  int sensorVal = detectFlowSensor1();
   time_t timeNow = readTimeCounter();
   Serial.print("Wifi status  ");
   Serial.println(WiFi.status());
@@ -119,156 +135,156 @@ void loop() {
 
 
   Serial.print("the curent state is ");
-  Serial.println(stateStatus, DEC);
+  Serial.println(stateStatusTank1, DEC);
   Serial.print("The previous state is ");
-  Serial.println(previousStateStatus, DEC);
+  Serial.println(previousStateStatusTank1, DEC);
   Serial.print("The current sensor reading is ");
   Serial.println(sensorVal, DEC);
 
   Serial1.print("the curent state is ");
-  Serial1.println(stateStatus, DEC);
+  Serial1.println(stateStatusTank1, DEC);
   Serial1.print("The previous state is ");
-  Serial1.println(previousStateStatus, DEC);
+  Serial1.println(previousStateStatusTank1, DEC);
   Serial1.print("The current sensor reading is ");
   Serial1.println(sensorVal, DEC);
 
-  if (stateStatus == 100) {
+  if (stateStatusTank1 == 100) {
     // means need initialize
     if (sensorVal == 1) {
-      startFlowTime = timeNow;
-      updateStateStatus(1);
+      startFlowTimeTank1 = timeNow;
+      updateStateStatus(&previousStateStatusTank1, &stateStatusTank1, 1);
     } else {
-      endFlowRateTime = timeNow;
-      updateStateStatus(0);
+      endFlowRateTimeTank1 = timeNow;
+      updateStateStatus( &previousStateStatusTank1, &stateStatusTank1,0);
     }
     lastPingGoogleTime=timeNow;
 
-  } else if (stateStatus == 0) {
+  } else if (stateStatusTank1 == 0) {
     // means no water flow
 
     if (sensorVal == 1) {
       // means flow  start
-      startFlowTime = timeNow;
-      updateStateStatus(1);
-      maxFlowTimeErrorCounter = 0;
-      maxNoFlowTimeErrorCounter = 0;
+      startFlowTimeTank1 = timeNow;
+      updateStateStatus(&previousStateStatusTank1, &stateStatusTank1, 1);
+      maxFlowTimeErrorCounterTank1 = 0;
+      maxNoFlowTimeErrorCounterTank1 = 0;
 
     } else {
       // means no flow
-      time_t difference = timeDifference(endFlowRateTime, timeNow);
+      time_t difference = timeDifference(endFlowRateTimeTank1, timeNow);
       int minute = timeDifferenceInMinute(difference);
       Serial.print("The non water flow time difference in second is ");
       Serial.print(difference);
 
       Serial.print("The max no flowtime error counter is ");
-      Serial.println(maxNoFlowTimeErrorCounter, DEC);
+      Serial.println(maxNoFlowTimeErrorCounterTank1, DEC);
 
-      // int temp = (minute - maxNoFlowTime * maxNoFlowTimeErrorCounter);
+      // int temp = (minute - maxNoFlowTimeTank1 * maxNoFlowTimeErrorCounterTank1);
       // Serial.print("The no water flow differece is ");
       // Serial.println(temp);
-      if ((minute - maxNoFlowTime * maxNoFlowTimeErrorCounter) >= maxNoFlowTime) {
+      if ((minute - maxNoFlowTimeTank1 * maxNoFlowTimeErrorCounterTank1) >= maxNoFlowTimeTank1) {
         // need to trigger an error state to send email
-        updateStateStatus(2);
+        updateStateStatus(&previousStateStatusTank1, &stateStatusTank1,2);
       } else {
         // let us continue waiting
         // this could mean
-        // no error happen, maxNoFlowTimeErrorCounter ==0
+        // no error happen, maxNoFlowTimeErrorCounterTank1 ==0
         // or error already happened once, and we already send a email about it.
         ;
       }
     }
-  } else if (stateStatus == 1) {
+  } else if (stateStatusTank1 == 1) {
     if (sensorVal == 1) {
       // water is flowing;
 
 
-      time_t difference = timeDifference(startFlowTime, timeNow);
+      time_t difference = timeDifference(startFlowTimeTank1, timeNow);
       int min = timeDifferenceInMinute(difference);
       Serial.print("The water flow time difference in second is ");
       Serial.println(difference);
 
       Serial.print("The max flowtime error counter is ");
-      Serial.println(maxFlowTimeErrorCounter, DEC);
-      // int temp = min - maxFlowTime * maxFlowTimeErrorCounter;
+      Serial.println(maxFlowTimeErrorCounterTank1, DEC);
+      // int temp = min - maxFlowTimeTank1 * maxFlowTimeErrorCounterTank1;
       // // Serial.print("The water flow difference is ");
       // // Serial.println(temp, DEC);
-      if ((min - maxFlowTime * maxFlowTimeErrorCounter) >= maxFlowTime) {
+      if ((min - maxFlowTimeTank1 * maxFlowTimeErrorCounterTank1) >= maxFlowTimeTank1) {
         // trigger into error state
-        updateStateStatus(2);
+        updateStateStatus(&previousStateStatusTank1, &stateStatusTank1,2);
       } else {
         // continue waiting
-        // means either error alread happened and already send out a email about it,  maxFlowTimeErrorCounter>1, or no error happened yet.
+        // means either error alread happened and already send out a email about it,  maxFlowTimeErrorCounterTank1>1, or no error happened yet.
       }
     } else {
       // means need to switch to state 0
-      updateStateStatus(0);
-      maxFlowTimeErrorCounter = 0;
-      maxNoFlowTimeErrorCounter = 0;
-      endFlowRateTime = timeNow;
+      updateStateStatus(&previousStateStatusTank1, &stateStatusTank1,0);
+      maxFlowTimeErrorCounterTank1 = 0;
+      maxNoFlowTimeErrorCounterTank1 = 0;
+      endFlowRateTimeTank1 = timeNow;
     }
   } else {
 
     Serial.println("In error state function");
 
-    if (previousStateStatus == 1) {
+    if (previousStateStatusTank1 == 1) {
       Serial.print("Error for water is flowing: ");
-      time_t diff = timeDifference(startFlowTime, timeNow);
+      time_t diff = timeDifference(startFlowTimeTank1, timeNow);
       int minutes = timeDifferenceInMinute(diff);
       Serial.println(minutes, DEC);
-      if (maxFlowTimeErrorCounter == 0) {
+      if (maxFlowTimeErrorCounterTank1 == 0) {
         bool status = sendEmailAlert("const water flow longer than expected time");
         if (status == false) {
           // means gmail did not send through
           // do not update status, comeback again
-          maxFlowTimeErrorCounter = 0;  // means come back later
-          maxNoFlowTimeErrorCounter = 0;
+          maxFlowTimeErrorCounterTank1 = 0;  // means come back later
+          maxNoFlowTimeErrorCounterTank1 = 0;
           Serial.println("Failed to send out constant waterflow email");
 
         } else {
           // means able to send warning email
-          updateStateStatus(1);
-          maxFlowTimeErrorCounter++;
-          maxNoFlowTimeErrorCounter = 0;
+          updateStateStatus(&previousStateStatusTank1, &stateStatusTank1,1);
+          maxFlowTimeErrorCounterTank1++;
+          maxNoFlowTimeErrorCounterTank1 = 0;
         }
       } else {
         // error email already send, do not send email, but update the rest.
-        updateStateStatus(1);
-        maxFlowTimeErrorCounter++;
-        maxNoFlowTimeErrorCounter = 0;
+        updateStateStatus(&previousStateStatusTank1, &stateStatusTank1,1);
+        maxFlowTimeErrorCounterTank1++;
+        maxNoFlowTimeErrorCounterTank1 = 0;
       }
 
 
     } else {
       Serial.println("Error for no water is flowing");
-      time_t diff = timeDifference(endFlowRateTime, timeNow);
+      time_t diff = timeDifference(endFlowRateTimeTank1, timeNow);
       int minutes = timeDifferenceInMinute(diff);
       Serial.println(minutes);
       //sendEmailAlert("No water flow longer than expected time");
 
 
-      if (maxNoFlowTimeErrorCounter == 0) {
+      if (maxNoFlowTimeErrorCounterTank1 == 0) {
         bool status = sendEmailAlert("No water flow longer than expected time");
         if (status == false) {
           // means gmail did not send through
           // do not update status, comeback again
-          maxFlowTimeErrorCounter = 0;  // means come back later
-          maxNoFlowTimeErrorCounter = 0;
+          maxFlowTimeErrorCounterTank1 = 0;  // means come back later
+          maxNoFlowTimeErrorCounterTank1 = 0;
         } else {
           // means able to send warning email
-          updateStateStatus(0);
-          maxFlowTimeErrorCounter = 0;
-          maxNoFlowTimeErrorCounter++;
+          updateStateStatus(&previousStateStatusTank1, &stateStatusTank1,0);
+          maxFlowTimeErrorCounterTank1 = 0;
+          maxNoFlowTimeErrorCounterTank1++;
         }
       } else {
         // error email already send, do not send email, but update the rest
-        updateStateStatus(0);
-        maxFlowTimeErrorCounter = 0;
-        maxNoFlowTimeErrorCounter++;
+        updateStateStatus(&previousStateStatusTank1, &stateStatusTank1,0);
+        maxFlowTimeErrorCounterTank1 = 0;
+        maxNoFlowTimeErrorCounterTank1++;
       }
     }
   }
 
-  controlLEDBaseOnStatus();
+  controlLEDBaseOnStatus(stateStatusTank1, previousStateStatusTank1,ERROR_LED_TANK_1, FLOW_PRESENT_TANK_1, NO_FLOW_PRESENT_TANK_1);
 
   delay(1000);
   timeCounter++;
@@ -288,28 +304,32 @@ void reconnectToWifi(){
   digitalWrite(LED_BUILTIN, HIGH);
   sendEmailAlert("Experience wifi signal lost");
 }
-void controlLEDBaseOnStatus() {
+void controlLEDBaseOnStatus(char stateStatus, char previousStateStatus, char errorLEDPin, char flowPresentLEDPin, char noFlowPresentLEDPin) {
 
 
   // turn all led off first
-  digitalWrite(ERROR_LED, LOW);
-  digitalWrite(FLOW_PRESENT, LOW);
-  digitalWrite(NO_FLOW_PRESENT, LOW);
+
+
+  digitalWrite(errorLEDPin, LOW);
+  digitalWrite(flowPresentLEDPin, LOW);
+  digitalWrite(noFlowPresentLEDPin, LOW);
 
   if (stateStatus == 2 || previousStateStatus == 2) {
-    digitalWrite(ERROR_LED, HIGH);
+    digitalWrite(errorLEDPin, HIGH);
     if (stateStatus == 0 || previousStateStatus == 0) {
-      digitalWrite(NO_FLOW_PRESENT, HIGH);
+      digitalWrite(noFlowPresentLEDPin, HIGH);
     }
     if (stateStatus == 1 || previousStateStatus == 1) {
-      digitalWrite(FLOW_PRESENT, HIGH);
+      digitalWrite(flowPresentLEDPin, HIGH);
     }
   }else{
     // means it is normal, no red light
     if(stateStatus == 0){
-      digitalWrite(NO_FLOW_PRESENT, HIGH);
+      digitalWrite(noFlowPresentLEDPin, HIGH);
     }else if(stateStatus == 1){
-       digitalWrite(FLOW_PRESENT, HIGH);     
+       digitalWrite(flowPresentLEDPin, HIGH);     
+    }else{
+      // means at 100(start), do nothing
     }
   }
 }
@@ -317,12 +337,14 @@ void controlLEDBaseOnStatus() {
 
 
 
+int detectFlowSensor1(){
+  return  digitalRead(SENSOR_PIN_TANK_1);
+}
 
+void updateStateStatus(volatile char *previousStatus, volatile char *stateStatus,  char newStatus) {
 
-void updateStateStatus(char newStatus) {
-
-  previousStateStatus = stateStatus;
-  stateStatus = newStatus;
+  *previousStatus = *stateStatus;
+  *stateStatus = newStatus;
 }
 
 
