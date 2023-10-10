@@ -18,8 +18,8 @@ Things to note:
 #include "arduino_secrets.h"
 #include <vector>
 #include <string>
-#include <TimeLib.h>
-
+// #include <TimeLib.h>
+#include <time.h>
 #define ERROR_LED 12
 #define FLOW_PRESENT 11
 #define NO_FLOW_PRESENT 10
@@ -40,19 +40,19 @@ byte mac[6];
 
 
 
-char stateStatus = 100;  // 0 means no waterflow, 1 means water flow, 2 is error, 100 means need initalize
-char previousStateStatus = 0;
+volatile char stateStatus = 100;  // 0 means no waterflow, 1 means water flow, 2 is error, 100 means need initalize
+volatile char previousStateStatus = 0;
 char maxFlowTime = 10;
-char maxFlowTimeErrorCounter = 0;
+volatile char maxFlowTimeErrorCounter = 0;
 char maxNoFlowTime = 20;
-char maxNoFlowTimeErrorCounter = 0;
-time_t startFlowTime, endFlowTime;
-time_t endFlowRateTime;
-time_t prevDisplay = 0;  // when the digital clock was displayed
+volatile char maxNoFlowTimeErrorCounter = 0;
+volatile time_t startFlowTime, endFlowTime;
+volatile time_t endFlowRateTime;
+
 
 time_t lastPingGoogleTime = 0;
 
-
+time_t timeCounter = 0;
 void printMacAddress();
 void printMacAddress(byte mac[]) ;
 void addEmailRecipient(WiFiSSLClient &client);
@@ -66,6 +66,8 @@ void reconnectToWifi();
 
 void pingGoogle();
 void listNetworks();
+time_t readTimeCounter();
+
 void setup() {
   //Initialize serial and wait for port to open:
   Serial.begin(9600);
@@ -89,12 +91,12 @@ void setup() {
   delay(1000);
   //analogWrite(LED_BUILTIN,100);
   //_connectToWifi(ssid, pass);
-  WiFi.lowPowerMode();
+  //WiFi.lowPowerMode();
   listNetworks();
-  //__connectToWifiEnterprise(ssid, username, pass);
-  _connectToWifi(ssid, pass);
-  setSyncInterval(-1);
-  setTime(1357041600);
+  __connectToWifiEnterprise(ssid, username, pass);
+  //_connectToWifi(ssid, pass);
+  //setSyncInterval(-1);
+  //setTime(1357041600);
   digitalWrite(LED_BUILTIN, HIGH);  // light led indicate connected to wifi
   delay(1000);
   pingGoogle();
@@ -104,7 +106,7 @@ void setup() {
 void loop() {
   //Serial.println(getWifiTime(),DEC);
   int sensorVal = digitalRead(2);
-  time_t timeNow = now();
+  time_t timeNow = readTimeCounter();
   Serial.print("Wifi status  ");
   Serial.println(WiFi.status());
   if(WiFi.status() != WL_CONNECTED){
@@ -269,17 +271,22 @@ void loop() {
   controlLEDBaseOnStatus();
 
   delay(1000);
+  timeCounter++;
 }
 
+time_t readTimeCounter(){
+  return timeCounter;
+}
 
 void reconnectToWifi(){
-  //digitalWrite(LED_BUILTIN,LOW);
-  analogWrite(LED_BUILTIN,200);
+  digitalWrite(LED_BUILTIN,LOW);
   WiFi.end();
   listNetworks();
+  //_connectToWifi(ssid, pass);
   __connectToWifiEnterprise(ssid, username, pass); //while loop that connect to wifi
   // reconnect to wifi
   digitalWrite(LED_BUILTIN, HIGH);
+  sendEmailAlert("Experience wifi signal lost");
 }
 void controlLEDBaseOnStatus() {
 
